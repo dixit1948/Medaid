@@ -2,9 +2,8 @@
 // 🏥 Database connection
 $conn = new mysqli("localhost", "root", "", "medical_db");
 if ($conn->connect_error) {
-    die("Database connection failed: " . $conn->connect_error);
+    die("Database connection failed");
 }
-
 $success = $error = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -15,40 +14,41 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $doctor     = $_POST["doctor"] ?? '';
     $message    = $_POST["message"] ?? '';
     $user_date  = $_POST["date"] ?? '';
+    $date_time  = date("Y-m-d H:i:s", strtotime($user_date));
 
     if (!empty($user_date)) {
         $date_time = date("Y-m-d H:i:s", strtotime($user_date));
-    } else {
-        $error = "Please select a valid appointment date and time.";
+    }else{
+        echo "Please select a valid appointment date and time.";
+        exit;
     }
 
-    if (empty($error)) {
-        // 🔍 Check if same date & time already exists
-        $check_sql = "SELECT id FROM appointments WHERE date_time = ?";
-        $stmt = $conn->prepare($check_sql);
-        $stmt->bind_param("s", $date_time);
-        $stmt->execute();
-        $stmt->store_result();
+    // 🔍 Check if same date & time already exists
+    $check_sql = "SELECT id FROM appointments WHERE date_time = ?";
+    $stmt = $conn->prepare($check_sql);
+    $stmt->bind_param("s", $date_time);
+    $stmt->execute();
+    $stmt->store_result();
 
-        if ($stmt->num_rows > 0) {
-            // ❌ Already booked
-            $error = "This time slot is already booked. Please choose another time.";
+    if ($stmt->num_rows > 0) {
+        // ❌ Already booked
+        $error = "This time slot is already booked. Please choose another time.";
+    }$stmt->close();
+        // ✅ Insert new appointment
+         $sql = "INSERT INTO appointments (first_name, last_name, phone, date_time, department, doctor, message) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("sssssss", $first_name, $last_name, $phone, $date_time, $department, $doctor, $message);
+
+    if ($stmt->execute()) {
+        echo "OK"; 
+        if ($stmt->execute()) {
+            $success = "Appointment successfully booked!";
         } else {
-            // ✅ Insert new appointment
-            $sql = "INSERT INTO appointments 
-                    (first_name, last_name, phone, date_time, department, doctor, message) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?)";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("sssssss", $first_name, $last_name, $phone, $date_time, $department, $doctor, $message);
-
-            if ($stmt->execute()) {
-                $success = "Appointment successfully booked!";
-            } else {
-                $error = "Database error: " . $stmt->error;
-            }
+            $error = "Database error: " . $stmt->error;
         }
-        $stmt->close();
-    }
+    $stmt->close();
+}
 }
 $conn->close();
 ?>
